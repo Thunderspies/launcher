@@ -127,6 +127,22 @@ void MainWindow::downloadItem(ManifestItem *item) {
 
     connect(watcher, &QFutureWatcher<bool>::finished, [=] {
 
+        QFileInfo(item->fname).dir().mkpath(".");
+        QSaveFile *file = new QSaveFile(item->fname);
+        if(!file->open(QIODevice::WriteOnly)) {
+            qWarning() << "failed to write to " << item->fname;
+            errorFiles.append(item->fname + " failed to create");
+            if(currentFiles + errorFiles.length() >= maxFiles) {
+                ui->ValidateButton->setEnabled(true);
+                ui->listWidget->setEnabled(true);
+                qWarning() << "Opening error window.";
+                ErrorWindow *w = new ErrorWindow(this);
+                w->addErrors(errorFiles);
+                w->show();
+            }
+            return;
+        }
+
         if(future.result()) {
             qInfo() << item->fname + " validated";
             currentFiles++;
@@ -153,24 +169,9 @@ void MainWindow::downloadItem(ManifestItem *item) {
         }
 
         if(item->urls.isEmpty()) {
+            file->cancelWriting();
             qWarning() << "failed to download " << item->fname;
             errorFiles.append(item->fname + " failed to download");
-            if(currentFiles + errorFiles.length() >= maxFiles) {
-                ui->ValidateButton->setEnabled(true);
-                ui->listWidget->setEnabled(true);
-                qWarning() << "Opening error window.";
-                ErrorWindow *w = new ErrorWindow(this);
-                w->addErrors(errorFiles);
-                w->show();
-            }
-            return;
-        }
-
-        QFileInfo(item->fname).dir().mkpath(".");
-        QSaveFile *file = new QSaveFile(item->fname);
-        if(!file->open(QIODevice::WriteOnly)) {
-            qWarning() << "failed to write to " << item->fname;
-            errorFiles.append(item->fname + " failed to create");
             if(currentFiles + errorFiles.length() >= maxFiles) {
                 ui->ValidateButton->setEnabled(true);
                 ui->listWidget->setEnabled(true);
