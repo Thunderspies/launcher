@@ -39,13 +39,6 @@ OptionsWindow::OptionsWindow(QWidget *parent) :
         });
 
     connect (
-        ui->RemoveManifestButton,
-        &QPushButton::released,
-        [this] {
-            qDeleteAll(ui->ManifestList->selectedItems());
-        });
-
-    connect (
         ui->ApplyButton,
         &QPushButton::released,
         [this] {
@@ -75,6 +68,16 @@ OptionsWindow::OptionsWindow(QWidget *parent) :
             QString launchParams = ui->ParamLine->text();
             settings->setValue("launchParams", launchParams);
         });
+    \
+    connect (
+        ui->actionDeleteManifest,
+        &QAction::triggered,
+        this,
+        [this] {
+            qDeleteAll(ui->ManifestList->selectedItems());
+        });
+
+    ui->ManifestList->addAction(ui->actionDeleteManifest);
 
 }
 
