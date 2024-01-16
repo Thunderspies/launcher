@@ -17,13 +17,6 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <widget class="QPushButton" name="RemoveManifestButton">
-       <property name="text">
-        <string>remove</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QPushButton" name="AddManifestButton">
        <property name="text">
         <string>add</string>
@@ -52,6 +45,9 @@
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::ActionsContextMenu</enum>
      </property>
     </widget>
    </item>
@@ -110,6 +106,14 @@
     </layout>
    </item>
   </layout>
+  <action name="actionDeleteManifest">
+   <property name="text">
+    <string>Delete Manifest</string>
+   </property>
+   <property name="shortcut">
+    <string>Del</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>
