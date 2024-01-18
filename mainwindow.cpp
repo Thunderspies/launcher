@@ -9,6 +9,7 @@
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QDesktopServices>
+#include <QJsonDocument>
 
 // FIXME: Don't put so much in the main window.
 MainWindow::MainWindow (
@@ -92,6 +93,37 @@ void MainWindow::setup() {
         &QPushButton::released,
         [this] {
             validateManifest(manifest);
+        });
+
+    QSettings *settings = new QSettings();
+    if(!settings->value("checkUpdates", true).toBool())
+        return;
+
+    /*
+     * Check for an update.
+     */
+    QNetworkRequest req(QUrl("https://api.github.com/repos/Thunderspies/launcher/releases/latest"));
+    QNetworkReply *res = netMan.get(req);
+    connect (
+        res,
+        &QNetworkReply::finished,
+        [res, settings] {
+            QString tag = QJsonDocument::fromJson(res->readAll()).object().value("tag_name").toString();
+            if(tag == TOSTRING(VERSION))
+                return;
+            QMessageBox msgBox;
+            msgBox.setWindowTitle("Update Available");
+            msgBox.setText("A new update is available");
+            msgBox.setInformativeText("Would you like to view the latest release?");
+            msgBox.addButton(QMessageBox::Ignore);
+            QAbstractButton *viewButton = msgBox.addButton("View Release", QMessageBox::YesRole);
+            QAbstractButton *disableButton = msgBox.addButton("Never Check", QMessageBox::ActionRole);
+            connect(disableButton, &QAbstractButton::pressed, [settings] {
+                settings->setValue("checkUpdates", false);
+            });
+            msgBox.exec();
+            if(msgBox.clickedButton() == viewButton)
+                QDesktopServices::openUrl(QUrl("https://github.com/Thunderspies/launcher/releases/latest"));
         });
 
 }
@@ -254,7 +286,7 @@ void MainWindow::addServerEntry(ServerEntry *server) {
     // Download the message of the day (MoTD) if one is available.
     if(!server->motd.isEmpty()) {
         QNetworkRequest req(server->motd);
-        req.setHeader(QNetworkRequest::UserAgentHeader, "Sweet Tea / 1.2.0");
+        req.setHeader(QNetworkRequest::UserAgentHeader, "Sweet Tea / " + QString(TOSTRING(VERSION)));
         req.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
         QNetworkReply *res = netMan.get(req);
         item->setData(Qt::UserRole, "Retrieving MoTD");
