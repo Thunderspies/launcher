@@ -224,7 +224,7 @@ void MainWindow::downloadItem(ManifestItem *item) {
             [=] {
 
                if(res->error() != QNetworkReply::NoError)
-                   qWarning() << res->request().url() << res->errorString();
+                   qWarning() << res->request().url().toString() << res->errorString();
 
                res->deleteLater();
                file->commit();
