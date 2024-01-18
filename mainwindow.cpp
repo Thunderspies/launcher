@@ -162,7 +162,7 @@ void MainWindow::downloadItem(ManifestItem *item) {
         QFileInfo(item->fname).dir().mkpath(".");
         QSaveFile *file = new QSaveFile(item->fname);
         if(!file->open(QIODevice::WriteOnly)) {
-            qWarning() << "failed to write to " << item->fname;
+            qCritical() << "failed to write to " << item->fname;
             errorFiles++;
             if(currentFiles + errorFiles >= maxFiles) {
                 ui->ValidateButton->setEnabled(true);
@@ -198,7 +198,7 @@ void MainWindow::downloadItem(ManifestItem *item) {
 
         if(item->urls.isEmpty()) {
             file->cancelWriting();
-            qWarning() << "failed to download " << item->fname;
+            qCritical() << "failed to download " << item->fname;
             errorFiles++;
             if(currentFiles + errorFiles >= maxFiles) {
                 ui->ValidateButton->setEnabled(true);
