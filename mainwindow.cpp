@@ -109,7 +109,7 @@ void MainWindow::setup() {
         &QNetworkReply::finished,
         [res, settings] {
             QString tag = QJsonDocument::fromJson(res->readAll()).object().value("tag_name").toString();
-            if(tag == VERSION)
+            if(tag == TOSTRING(VERSION))
                 return;
             QMessageBox msgBox;
             msgBox.setWindowTitle("Update Available");
@@ -286,7 +286,7 @@ void MainWindow::addServerEntry(ServerEntry *server) {
     // Download the message of the day (MoTD) if one is available.
     if(!server->motd.isEmpty()) {
         QNetworkRequest req(server->motd);
-        req.setHeader(QNetworkRequest::UserAgentHeader, "Sweet Tea / " + QString(VERSION));
+        req.setHeader(QNetworkRequest::UserAgentHeader, "Sweet Tea / " + QString(TOSTRING(VERSION)));
         req.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
         QNetworkReply *res = netMan.get(req);
         item->setData(Qt::UserRole, "Retrieving MoTD");
