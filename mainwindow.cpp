@@ -169,7 +169,6 @@ void MainWindow::downloadItem(ManifestItem *item) {
                 ui->listWidget->setEnabled(true);
                 qWarning() << "Opening error window.";
                 ErrorWindow *w = new ErrorWindow(this);
-                w->addErrors(errorFiles);
                 w->show();
             }
             return;
@@ -191,7 +190,6 @@ void MainWindow::downloadItem(ManifestItem *item) {
                 } else {
                     qWarning() << "Opening error window.";
                     ErrorWindow *w = new ErrorWindow(this);
-                    w->addErrors(errorFiles);
                     w->show();
                 }
                 ui->ValidateButton->setEnabled(true);
@@ -209,7 +207,6 @@ void MainWindow::downloadItem(ManifestItem *item) {
                 ui->listWidget->setEnabled(true);
                 qWarning() << "Opening error window.";
                 ErrorWindow *w = new ErrorWindow(this);
-                w->addErrors(errorFiles);
                 w->show();
             }
             return;
