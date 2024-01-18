@@ -167,7 +167,6 @@ void MainWindow::downloadItem(ManifestItem *item) {
             if(currentFiles + errorFiles.length() >= maxFiles) {
                 ui->ValidateButton->setEnabled(true);
                 ui->listWidget->setEnabled(true);
-                qWarning() << "Opening error window.";
                 ErrorWindow *w = new ErrorWindow(this);
                 w->show();
             }
@@ -188,7 +187,6 @@ void MainWindow::downloadItem(ManifestItem *item) {
                     qInfo() << settings.value("oldDir").toString();
                     ui->LaunchButton->setEnabled(true);
                 } else {
-                    qWarning() << "Opening error window.";
                     ErrorWindow *w = new ErrorWindow(this);
                     w->show();
                 }
@@ -205,7 +203,6 @@ void MainWindow::downloadItem(ManifestItem *item) {
             if(currentFiles + errorFiles.length() >= maxFiles) {
                 ui->ValidateButton->setEnabled(true);
                 ui->listWidget->setEnabled(true);
-                qWarning() << "Opening error window.";
                 ErrorWindow *w = new ErrorWindow(this);
                 w->show();
             }
