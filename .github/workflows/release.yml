@@ -27,6 +27,11 @@ jobs:
             qmake-static
             make
 
+      - name: Create installer
+        run: |
+          sudo apt update && sudo apt install -y nsis
+          makensis -Dmanifests=${{ secrets.MANIFESTS }} installer.nsi
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -45,5 +50,15 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./release/Sweet-Tea.exe
           asset_name: Sweet-Tea-${{ github.ref_name }}.exe
+          asset_content_type: application/octet-stream
+
+      - name: Archive installer
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./installer.exe
+          asset_name: Sweet-Tea-installer-${{ github.ref_name }}.exe
           asset_content_type: application/octet-stream
 
