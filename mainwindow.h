@@ -9,6 +9,12 @@
 #include <QNetworkReply>
 #include <QProgressDialog>
 
+#ifndef VERSION
+#define VERSION x.y.z
+#endif
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE

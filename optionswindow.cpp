@@ -22,6 +22,11 @@ OptionsWindow::OptionsWindow(QWidget *parent) :
                 .toString());
     ui->ParamLine->setText(settings->value("launchParams", "").toString());
 
+    ui->checkUpdates->setChecked(settings->value("checkUpdates", true).toBool());
+    connect(ui->checkUpdates, &QCheckBox::stateChanged, [this, settings] {
+        settings->setValue("checkUpdates", ui->checkUpdates->isChecked());
+    });
+
     connect (
         ui->NewManifestLine,
         &QLineEdit::returnPressed,
