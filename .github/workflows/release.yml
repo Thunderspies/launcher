@@ -24,7 +24,7 @@ jobs:
             -e QT_SELECT=qt5-x86_64-w64-mingw32
             -w /ws
           run: |
-            qmake-static DEFINES+=VERSION=\\\\\\"${{ github.ref_name }}\\\\\\"
+            qmake-static DEFINES+=VERSION=${{ github.ref_name }}
             make
 
       - name: Create installer
