@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
         else
             qWarning() << "unable to create: " + datadir;
     }
-    g_logFile = new QFile(datadir + "/log.txt");
+    g_logFile = new QFile("log.txt");
     qInstallMessageHandler(logHandler);
 
     QObject::connect(&a, &QCoreApplication::aboutToQuit, g_logFile, &QFile::close);
