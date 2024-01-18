@@ -163,8 +163,8 @@ void MainWindow::downloadItem(ManifestItem *item) {
         QSaveFile *file = new QSaveFile(item->fname);
         if(!file->open(QIODevice::WriteOnly)) {
             qWarning() << "failed to write to " << item->fname;
-            errorFiles.append(item->fname + " failed to create");
-            if(currentFiles + errorFiles.length() >= maxFiles) {
+            errorFiles++;
+            if(currentFiles + errorFiles >= maxFiles) {
                 ui->ValidateButton->setEnabled(true);
                 ui->listWidget->setEnabled(true);
                 ErrorWindow *w = new ErrorWindow(this);
@@ -177,9 +177,9 @@ void MainWindow::downloadItem(ManifestItem *item) {
             qInfo() << item->fname + " validated";
             currentFiles++;
             ui->UpdateProgress->setValue(currentFiles);
-            if(currentFiles + errorFiles.length() >= maxFiles) {
+            if(currentFiles + errorFiles >= maxFiles) {
                 qInfo() << "last file";
-                if(errorFiles.length() <= 0) {
+                if(errorFiles <= 0) {
                     QSettings settings;
                     settings.setValue("manifestChecksum", manifest->checksum);
                     settings.setValue("oldDir", QDir::currentPath());
@@ -199,8 +199,8 @@ void MainWindow::downloadItem(ManifestItem *item) {
         if(item->urls.isEmpty()) {
             file->cancelWriting();
             qWarning() << "failed to download " << item->fname;
-            errorFiles.append(item->fname + " failed to download");
-            if(currentFiles + errorFiles.length() >= maxFiles) {
+            errorFiles++;
+            if(currentFiles + errorFiles >= maxFiles) {
                 ui->ValidateButton->setEnabled(true);
                 ui->listWidget->setEnabled(true);
                 ErrorWindow *w = new ErrorWindow(this);
@@ -475,7 +475,7 @@ void MainWindow::validateManifest(Manifest *manifest) {
      * progress bar. This can be removed later.
      */
     currentFiles = 0;
-    errorFiles.clear();
+    errorFiles = 0;
     maxFiles = manifest->items.size();
 
     /*
