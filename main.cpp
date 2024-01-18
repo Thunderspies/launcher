@@ -4,6 +4,26 @@
 #include <QtDebug>
 #include <QApplication>
 
+static QFile *g_logFile;
+
+void logHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+    Q_UNUSED(context)
+    static QTextStream stream(g_logFile);
+    if(!g_logFile->isOpen()) {
+        g_logFile->open(QIODevice::WriteOnly);
+    }
+    QString typeString;
+    switch(type) {
+        case QtDebugMsg: typeString = "Debug"; break;
+        case QtWarningMsg: typeString = "Warning"; break;
+        case QtCriticalMsg: typeString = "Critical"; break;
+        case QtFatalMsg: typeString = "Fatal"; break;
+        case QtInfoMsg: typeString = "Info"; break;
+    }
+    stream << QString("%1: %2").arg(typeString, msg) << Qt::endl;
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -28,6 +48,10 @@ int main(int argc, char *argv[])
         else
             qWarning() << "unable to create: " + datadir;
     }
+    g_logFile = new QFile(datadir + "/log.txt");
+    qInstallMessageHandler(logHandler);
+
+    QObject::connect(&a, &QCoreApplication::aboutToQuit, g_logFile, &QFile::close);
 
     // Show the main window.
     MainWindow w;
