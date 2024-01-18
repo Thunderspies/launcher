@@ -13,8 +13,10 @@ OptionsWindow::OptionsWindow(QWidget *parent) :
 
     ui->setupUi(this);
 
+    static const QRegExp validUrl("\\w+://[-\\w\\.]+(:\\d+)?(/[-\\w\\.]+)+");
+
     QSettings *settings = new QSettings();
-    ui->ManifestList->addItems(settings->value("manifests").toString().split(" "));
+    ui->ManifestList->addItems(settings->value("manifests").toString().split(" ").filter(validUrl));
     ui->DownloadPathLine->setText(
                 settings->value("datadir",
                                QStandardPaths::writableLocation(
@@ -31,7 +33,8 @@ OptionsWindow::OptionsWindow(QWidget *parent) :
         ui->NewManifestLine,
         &QLineEdit::returnPressed,
         [this] {
-            ui->ManifestList->addItem(ui->NewManifestLine->text());
+            if(validUrl.exactMatch(ui->NewManifestLine->text()))
+                ui->ManifestList->addItem(ui->NewManifestLine->text());
             ui->NewManifestLine->clear();
         });
 
@@ -39,7 +42,8 @@ OptionsWindow::OptionsWindow(QWidget *parent) :
         ui->AddManifestButton,
         &QPushButton::released,
         [this] {
-            ui->ManifestList->addItem(ui->NewManifestLine->text());
+            if(validUrl.exactMatch(ui->NewManifestLine->text()))
+                ui->ManifestList->addItem(ui->NewManifestLine->text());
             ui->NewManifestLine->clear();
         });
 
