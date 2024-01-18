@@ -31,7 +31,7 @@ private:
     Ui::MainWindow *ui;
     Manifest* manifest;
     long currentFiles;
-    QList<QString> errorFiles;
+    long errorFiles;
     long maxFiles;
 
     void setup();
