@@ -9,6 +9,10 @@
 #include <QNetworkReply>
 #include <QProgressDialog>
 
+#ifndef VERSION
+#define VERSION "x.y.z"
+#endif
+
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
