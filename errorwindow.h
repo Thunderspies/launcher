@@ -14,7 +14,6 @@ class ErrorWindow : public QDialog
 public:
     explicit ErrorWindow(QWidget *parent = nullptr);
     ~ErrorWindow();
-    void addErrors(QStringList errors);
 
 private:
     Ui::ErrorWindow *ui;
