@@ -1,0 +1,49 @@
+name: Publish Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build
+        uses: addnab/docker-run-action@v3
+        with:
+          image: syping/qt5-static-mingw:5.9.9
+          options: |
+            -v ${{ github.workspace }}:/ws
+            -e QT_SELECT=qt5-x86_64-w64-mingw32
+            -w /ws
+          run: |
+            qmake-static
+            make
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}-${{ github.run_number }}
+          draft: true
+
+      - name: Archive executable
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/Sweet-Tea.exe
+          asset_name: Sweet-Tea-${{ github.ref_name }}.exe
+          asset_content_type: application/octet-stream
+
