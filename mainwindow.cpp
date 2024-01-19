@@ -82,7 +82,7 @@ void MainWindow::setup() {
             QListWidgetItem *item = ui->listWidget->currentItem();
             ServerEntry *server = item->data(Qt::UserRole + 1).value<ServerEntry*>();
             QString args = settings->value("launchParams", "").toString();
-            proc->startDetached(server->client, server->args.split(" ") + args.split(" "));
+            proc->startDetached(server->client, args.split(" ") + server->args.split(" "));
         });
 
     /*
