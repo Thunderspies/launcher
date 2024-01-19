@@ -159,20 +159,6 @@ void MainWindow::downloadItem(ManifestItem *item) {
 
     connect(watcher, &QFutureWatcher<bool>::finished, [=] {
 
-        QFileInfo(item->fname).dir().mkpath(".");
-        QSaveFile *file = new QSaveFile(item->fname);
-        if(!file->open(QIODevice::WriteOnly)) {
-            qCritical() << "failed to write to " << item->fname;
-            errorFiles++;
-            if(currentFiles + errorFiles >= maxFiles) {
-                ui->ValidateButton->setEnabled(true);
-                ui->listWidget->setEnabled(true);
-                ErrorWindow *w = new ErrorWindow(this);
-                w->show();
-            }
-            return;
-        }
-
         if(future.result()) {
             qInfo() << item->fname + " validated";
             currentFiles++;
@@ -192,6 +178,20 @@ void MainWindow::downloadItem(ManifestItem *item) {
                 }
                 ui->ValidateButton->setEnabled(true);
                 ui->listWidget->setEnabled(true);
+            }
+            return;
+        }
+
+        QFileInfo(item->fname).dir().mkpath(".");
+        QSaveFile *file = new QSaveFile(item->fname);
+        if(!file->open(QIODevice::WriteOnly)) {
+            qCritical() << "failed to write to " << item->fname;
+            errorFiles++;
+            if(currentFiles + errorFiles >= maxFiles) {
+                ui->ValidateButton->setEnabled(true);
+                ui->listWidget->setEnabled(true);
+                ErrorWindow *w = new ErrorWindow(this);
+                w->show();
             }
             return;
         }
