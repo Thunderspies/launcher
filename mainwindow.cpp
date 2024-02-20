@@ -209,7 +209,8 @@ void MainWindow::downloadItem(ManifestItem *item) {
             return;
         }
 
-        QNetworkRequest req(*item->urls.takeLast());
+        QUrl *url = item->urls.takeLast();
+        QNetworkRequest req(*url);
         req.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
         QNetworkReply *res = netMan.get(req);
         connect (
@@ -228,6 +229,7 @@ void MainWindow::downloadItem(ManifestItem *item) {
 
                res->deleteLater();
                file->commit();
+               item->urls.push_back(url);
                this->downloadItem(item);
 
             });
