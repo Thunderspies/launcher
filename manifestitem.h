@@ -13,6 +13,7 @@ public:
             long size,
             QList<QUrl*> &urls,
             QObject *parent = nullptr );
+    ~ManifestItem();
     bool validate();
 
     QString fname;

@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QDebug>
 #include <QSaveFile>
+#include <QUrl>
 
 ManifestItem::ManifestItem (
             QString &fname,
@@ -33,4 +34,8 @@ bool ManifestItem::validate() {
     file.close();
     return valid;
 
+}
+
+ManifestItem::~ManifestItem() {
+    qDeleteAll(urls);
 }
