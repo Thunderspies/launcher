@@ -86,3 +86,7 @@ bool Manifest::validate() {
         item->validate();
     return true;
 }
+
+Manifest::~Manifest() {
+    qDeleteAll(deletions);
+}

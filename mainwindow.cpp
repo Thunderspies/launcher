@@ -10,6 +10,9 @@
 #include <QProgressDialog>
 #include <QDesktopServices>
 #include <QJsonDocument>
+#include <QSignalBlocker>
+#include <QPersistentModelIndex>
+#include <QTimer>
 
 // FIXME: Don't put so much in the main window.
 MainWindow::MainWindow (
@@ -48,10 +51,17 @@ void MainWindow::setup() {
         ui->OptionsButton,
         &QPushButton::released,
         [this] {
+            if(busy || optionsOpen)
+                return;
+            optionsOpen = true;
             ui->OptionsButton->setEnabled(false);
+            ui->LaunchButton->setEnabled(false);
+            ui->ValidateButton->setEnabled(false);
+            ui->listWidget->setEnabled(false);
             OptionsWindow *w = new OptionsWindow(this);
             w->show();
-            connect(w, &QDialog::finished, [this] {
+            connect(w, &QDialog::finished, this, [this] {
+                optionsOpen = false;
                 ui->OptionsButton->setEnabled(true);
                 loadManifests();
             });
@@ -63,27 +73,18 @@ void MainWindow::setup() {
      */
     connect (
         ui->listWidget,
-        &QListWidget::itemClicked,
-        [this] {
-            QListWidgetItem *item = ui->listWidget->currentItem();
-            ServerEntry *entry = item->data(Qt::UserRole + 1).value<ServerEntry*>();
-            setManifest(entry->manifest);
+        &QListWidget::currentItemChanged,
+        this,
+        [this](QListWidgetItem *item) {
+            cancelOperation();
+            ServerEntry *entry = item ? item->data(Qt::UserRole + 1).value<ServerEntry*>() : nullptr;
+            setManifest(entry ? entry->manifest : nullptr);
         });
 
     /*
      * Configure the launch button to run with the given launch profile.
      */
-    connect (
-        ui->LaunchButton,
-        &QPushButton::released,
-        [this] {
-            QSettings *settings = new QSettings();
-            QProcess *proc = new QProcess(this);
-            QListWidgetItem *item = ui->listWidget->currentItem();
-            ServerEntry *server = item->data(Qt::UserRole + 1).value<ServerEntry*>();
-            QString args = settings->value("launchParams", "").toString();
-            proc->startDetached(server->client, args.split(" ") + server->args.split(" "));
-        });
+    connect(ui->LaunchButton, &QPushButton::released, this, &MainWindow::refreshForLaunch);
 
     /*
      * Configure the validate button to validate the selected manifest.
@@ -148,110 +149,94 @@ void MainWindow::deleteItem(QString *item) {
 
 /*
  * Download and/or validate a file in the given manifest.
- * FIXME: A LOT of code dupe.
  */
-void MainWindow::downloadItem(ManifestItem *item) {
+void MainWindow::downloadItem(ManifestItem *item, int attemptsRemaining) {
 
+    const quint64 generation = operationGeneration;
+    const QString filename = QDir(operationDirectory).absoluteFilePath(item->fname);
+    const QByteArray checksum = item->md5;
+    const long size = item->size;
     QFutureWatcher<bool> *watcher = new QFutureWatcher<bool>(this);
-    QFuture<bool> future = QtConcurrent::run([item]{
-        return item->validate();
+    // The worker owns copies so closing/reloading the window cannot destroy its input.
+    QFuture<bool> future = QtConcurrent::run([filename, checksum, size]() mutable {
+        QList<QUrl*> urls;
+        QString path = filename;
+        QByteArray md5 = checksum;
+        ManifestItem copy(path, md5, size, urls);
+        return copy.validate();
     });
-
-    connect(watcher, &QFutureWatcher<bool>::finished, [=] {
-
+    connect(watcher, &QFutureWatcher<bool>::finished, this, [=] {
+        watcher->deleteLater();
+        if(!busy || generation != operationGeneration)
+            return;
         if(future.result()) {
-            qInfo() << item->fname + " validated";
-            currentFiles++;
-            ui->UpdateProgress->setValue(currentFiles);
-            if(currentFiles + errorFiles >= maxFiles) {
-                qInfo() << "last file";
-                if(errorFiles <= 0) {
-                    QSettings settings;
-                    settings.setValue("manifestChecksum", manifest->checksum);
-                    settings.setValue("oldDir", QDir::currentPath());
-                    qInfo() << QDir::currentPath();
-                    qInfo() << settings.value("oldDir").toString();
-                    ui->LaunchButton->setEnabled(true);
-                } else {
-                    ErrorWindow *w = new ErrorWindow(this);
-                    w->show();
-                }
-                ui->ValidateButton->setEnabled(true);
-                ui->listWidget->setEnabled(true);
-            }
+            finishItem(true);
+            return;
+        }
+        if(attemptsRemaining <= 0) {
+            qCritical() << "failed to download or validate " << item->fname;
+            finishItem(false);
             return;
         }
 
-        QFileInfo(item->fname).dir().mkpath(".");
-        QSaveFile *file = new QSaveFile(item->fname);
+        QFileInfo(filename).dir().mkpath(".");
+        QSharedPointer<QSaveFile> file(new QSaveFile(filename));
         if(!file->open(QIODevice::WriteOnly)) {
-            qCritical() << "failed to write to " << item->fname;
-            errorFiles++;
-            if(currentFiles + errorFiles >= maxFiles) {
-                ui->ValidateButton->setEnabled(true);
-                ui->listWidget->setEnabled(true);
-                ErrorWindow *w = new ErrorWindow(this);
-                w->show();
-            }
+            qCritical() << "failed to write to " << filename;
+            finishItem(false);
             return;
         }
 
-        if(item->urls.isEmpty()) {
-            file->cancelWriting();
-            qCritical() << "failed to download " << item->fname;
-            errorFiles++;
-            if(currentFiles + errorFiles >= maxFiles) {
-                ui->ValidateButton->setEnabled(true);
-                ui->listWidget->setEnabled(true);
-                ErrorWindow *w = new ErrorWindow(this);
-                w->show();
-            }
-            return;
-        }
-
-        QUrl *url = item->urls.takeLast();
-        QNetworkRequest req(*url);
+        // Try each mirror at most once per validation, retaining them for future runs.
+        QNetworkRequest req(*item->urls.at(attemptsRemaining - 1));
         req.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
         QNetworkReply *res = netMan.get(req);
-        connect (
-            res,
-            &QNetworkReply::readyRead,
-            [=] {
-               file->write(res->read(res->bytesAvailable()));
-            });
-        connect (
-            res,
-            &QNetworkReply::finished,
-            [=] {
-
-               if(res->error() != QNetworkReply::NoError)
-                   qWarning() << res->request().url().toString() << res->errorString();
-
-               res->deleteLater();
-               file->commit();
-               item->urls.push_back(url);
-               this->downloadItem(item);
-
-            });
-
-        watcher->deleteLater();
-
+        operationReplies.append(res);
+        QTimer *timeout = new QTimer(res);
+        timeout->setSingleShot(true);
+        connect(timeout, &QTimer::timeout, res, &QNetworkReply::abort);
+        timeout->start(60000);
+        connect(res, &QNetworkReply::readyRead, this, [=] {
+            if(!busy || generation != operationGeneration)
+                return;
+            timeout->start(60000);
+            QByteArray data = res->readAll();
+            if(file->write(data) != data.size())
+                res->abort();
+        });
+        connect(res, &QNetworkReply::finished, this, [=] {
+            timeout->stop();
+            res->deleteLater();
+            if(!busy || generation != operationGeneration) {
+                file->cancelWriting();
+                return;
+            }
+            if(res->error() != QNetworkReply::NoError) {
+                qWarning() << res->request().url().toString() << res->errorString();
+                file->cancelWriting();
+            } else if(!file->commit()) {
+                qCritical() << "failed to save " << filename;
+                finishItem(false);
+                return;
+            }
+            downloadItem(item, attemptsRemaining - 1);
+        });
     });
-
     watcher->setFuture(future);
-
 }
 
 /*
  * Add a server entry (launch profile) to the UI list.
  */
 void MainWindow::addServerEntry(ServerEntry *server) {
+    const quint64 generation = loadGeneration;
 
     /*
      * Create a data model object for the list widget from the launch profile.
      */
     QListWidgetItem *item = new QListWidgetItem(server->name, ui->listWidget);
     item->setData(Qt::UserRole + 1, QVariant::fromValue(server));
+    const QPersistentModelIndex index(ui->listWidget->model()->index(ui->listWidget->row(item), 0));
 
     // Download the launch profile icon if it's there is one available.
     if(!server->icon.isEmpty()) {
@@ -261,7 +246,11 @@ void MainWindow::addServerEntry(ServerEntry *server) {
         connect (
             res,
             &QNetworkReply::finished,
+            this,
             [=] {
+               res->deleteLater();
+               if(generation != loadGeneration || !index.isValid())
+                   return;
 
                if(res->error() != QNetworkReply::NoError) {
                    qWarning() << "icon: " << res->errorString();
@@ -273,8 +262,6 @@ void MainWindow::addServerEntry(ServerEntry *server) {
                    qWarning() << "unable to read icon: " << server->icon;
                else
                    item->setIcon(QIcon(pixels));
-
-               res->deleteLater();
 
             });
     }
@@ -289,7 +276,11 @@ void MainWindow::addServerEntry(ServerEntry *server) {
         connect (
             res,
             &QNetworkReply::finished,
+            this,
             [=] {
+               res->deleteLater();
+               if(generation != loadGeneration || !index.isValid())
+                   return;
 
                if(res->error() != QNetworkReply::NoError) {
                    qWarning() << "motd: " << res->errorString();
@@ -300,8 +291,6 @@ void MainWindow::addServerEntry(ServerEntry *server) {
                QString motd(res->read(140));
                item->setData(Qt::UserRole, motd);
 
-               res->deleteLater();
-
             });
     }
 
@@ -311,94 +300,209 @@ void MainWindow::addServerEntry(ServerEntry *server) {
  * Read a manifest file from the local file system.
  */
 void MainWindow::openManifest(QString fname) {
-
-    /*
-     * Disable the validate button so it's not
-     * pressed while a manifest is being read
-     * still.
-     */
-    ui->ValidateButton->setEnabled(false);
-    ui->UpdateProgress->setValue(false);
-
-    // Parse the XML of the manifest.
-    QDomDocument doc;
     QFile file(fname);
-
-    if(file.open(QIODevice::ReadOnly) && doc.setContent(&file)) {
-
-        // Hash the manifest to easily compare to other manifests.
-        QCryptographicHash md5(QCryptographicHash::Md5);
-        md5.addData(doc.toByteArray());
-
-        // Create a manifest object from the XML file.
-        // Add its server entries (launch profiles) to the list.
-        Manifest *manifest = new Manifest(doc, md5.result());
-        for(ServerEntry *server : manifest->servers)
-            addServerEntry(server);
-
+    if(!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "unable to read manifest: " << fname;
+        return;
     }
-
-    else
-        // Log a critical error if the manifest can't be read.
-        // FIXME: Add to error list.
-        // FIXME: Make error critical.
-        qWarning() << "unable to read manifest: " + fname;
-
-    file.close();
-
+    Manifest *loaded = parseManifest(file.readAll(), QUrl::fromLocalFile(QFileInfo(fname).absoluteFilePath()));
+    if(loaded)
+        for(ServerEntry *server : loaded->servers)
+            addServerEntry(server);
 }
 
 /*
  * Download a manifest.
  */
 void MainWindow::downloadManifest(QUrl url) {
-
-    /*
-     * Disable the validate button so it's not
-     * pressed while a manifest is being downloaded
-     * still.
-     */
-    ui->ValidateButton->setEnabled(false);
-    ui->UpdateProgress->setValue(false);
-
-    /*
-     * Send an HTTP request to download the manifest,
-     * and add its launch profiles (server entries) to the
-     * list for display on success response.
-     */
+    const quint64 generation = loadGeneration;
     QNetworkRequest req(url);
     req.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
     QNetworkReply *res = netMan.get(req);
-    connect (
-        res,
-        &QNetworkReply::finished,
-        [=] {
+    QTimer::singleShot(30000, res, [res] { res->abort(); });
+    connect(res, &QNetworkReply::finished, this, [=] {
+        res->deleteLater();
+        if(generation != loadGeneration)
+            return;
+        if(res->error() != QNetworkReply::NoError) {
+            qCritical() << "manifest: " << res->errorString();
+            return;
+        }
+        Manifest *loaded = parseManifest(res->readAll(), url);
+        if(loaded)
+            for(ServerEntry *server : loaded->servers)
+                addServerEntry(server);
+    });
+}
 
-           // Log a critical error if the manifest can't be downloaded.
-           // FIXME: Add to error list.
-           if(res->error() != QNetworkReply::NoError)
-               qCritical() << "manifest: " << res->errorString();
+Manifest *MainWindow::parseManifest(const QByteArray &content, const QUrl &source) {
+    QDomDocument doc;
+    if(!doc.setContent(content)) {
+        qCritical() << "unable to parse manifest: " << source;
+        return nullptr;
+    }
+    Manifest *loaded = new Manifest(doc, QCryptographicHash::hash(content, QCryptographicHash::Md5), this);
+    loaded->source = source;
+    return loaded;
+}
 
-           // Parse the XML of the manifest.
-           QByteArray content = res->readAll();
-           QDomDocument doc = QDomDocument();
-           doc.setContent(content);
+bool MainWindow::isValidated(Manifest *manifest) const {
+    QSettings settings;
+    return manifest && settings.value("manifestChecksum").toByteArray() == manifest->checksum
+        && settings.value("oldDir").toString() == QDir::currentPath();
+}
 
-           // Hash the manifest to easily compare to other manifests.
-           QCryptographicHash md5(QCryptographicHash::Md5);
-           md5.addData(content);
+void MainWindow::beginOperation() {
+    busy = true;
+    ++operationGeneration;
+    operationDirectory = QDir::currentPath();
+    ui->LaunchButton->setEnabled(false);
+    ui->ValidateButton->setEnabled(false);
+    ui->OptionsButton->setEnabled(false);
+    ui->listWidget->setEnabled(false);
+}
 
-           // Create a manifest object from the XML file.
-           // Add its server entries (launch profiles) to the list.
-           Manifest *manifest = new Manifest(doc, md5.result());
-           for(ServerEntry *server : manifest->servers)
-               addServerEntry(server);
+void MainWindow::cancelOperation() {
+    ++operationGeneration;
+    busy = false;
+    pendingLaunch = nullptr;
+    const auto replies = operationReplies;
+    operationReplies.clear();
+    for(const auto &reply : replies)
+        if(reply && !reply->isFinished())
+            reply->abort();
+    ui->OptionsButton->setEnabled(!optionsOpen);
+    ui->listWidget->setEnabled(!optionsOpen);
+}
 
-           // Delete the response object to avoid memory leaks.
-           res->deleteLater();
+void MainWindow::finishOperation(bool success, const QString &error) {
+    ServerEntry *server = success ? pendingLaunch : nullptr;
+    pendingLaunch = nullptr;
+    busy = false;
+    operationReplies.clear();
+    ui->OptionsButton->setEnabled(!optionsOpen);
+    ui->listWidget->setEnabled(!optionsOpen);
+    ui->ValidateButton->setEnabled(manifest && !optionsOpen);
+    ui->LaunchButton->setEnabled(isValidated(manifest) && !optionsOpen);
+    if(!error.isEmpty()) {
+        QMessageBox::warning(this, "Launch Error", error);
+        return;
+    }
+    if(server) {
+        if(operationDirectory != QDir::currentPath()) {
+            QMessageBox::warning(this, "Launch Error", "The game directory changed. Please validate again.");
+            return;
+        }
+        QSettings settings;
+        const QString args = settings.value("launchParams", "").toString();
+        if(!QProcess::startDetached(server->client, args.split(" ") + server->args.split(" "), operationDirectory))
+            QMessageBox::warning(this, "Launch Error", "Unable to start " + server->client);
+    }
+}
 
-        });
+void MainWindow::refreshForLaunch() {
+    if(busy || optionsOpen || !ui->LaunchButton->isEnabled())
+        return;
+    QListWidgetItem *item = ui->listWidget->currentItem();
+    ServerEntry *selected = item ? item->data(Qt::UserRole + 1).value<ServerEntry*>() : nullptr;
+    if(!selected)
+        return;
+    manifest = selected->manifest;
+    beginOperation();
+    const quint64 generation = operationGeneration;
+    const QUrl source = manifest->source;
+    if(source.isLocalFile()) {
+        QFile file(source.toLocalFile());
+        if(!file.open(QIODevice::ReadOnly)) {
+            finishOperation(false, "Unable to read the manifest. Please try again.");
+            return;
+        }
+        acceptLaunchManifest(file.readAll(), selected);
+        return;
+    }
+    QNetworkRequest req(source);
+    req.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
+    req.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
+    req.setRawHeader("Cache-Control", "no-cache");
+    QNetworkReply *res = netMan.get(req);
+    operationReplies.append(res);
+    QTimer::singleShot(30000, res, [res] { res->abort(); });
+    connect(res, &QNetworkReply::finished, this, [=] {
+        res->deleteLater();
+        if(!busy || generation != operationGeneration)
+            return;
+        if(res->error() != QNetworkReply::NoError) {
+            finishOperation(false, "Unable to refresh the manifest: " + res->errorString());
+            return;
+        }
+        acceptLaunchManifest(res->readAll(), selected);
+    });
+}
 
+void MainWindow::acceptLaunchManifest(const QByteArray &content, ServerEntry *selected) {
+    Manifest *fresh = parseManifest(content, selected->manifest->source);
+    if(!fresh) {
+        finishOperation(false, "Unable to parse the refreshed manifest. Please try again.");
+        return;
+    }
+    ServerEntry *replacement = nullptr;
+    int matches = 0;
+    for(ServerEntry *server : fresh->servers) {
+        if(server->name == selected->name) {
+            replacement = server;
+            ++matches;
+        }
+    }
+    if(matches != 1 || replacement->client.isEmpty()) {
+        fresh->deleteLater();
+        finishOperation(false, "The selected launch profile is missing or ambiguous in the refreshed manifest. Reopen Options to reload the server list.");
+        return;
+    }
+    if(fresh->checksum == manifest->checksum) {
+        fresh->deleteLater();
+        pendingLaunch = selected;
+    } else {
+        Manifest *previous = manifest;
+        // Suppress selection changes while replacing exactly this manifest's profiles.
+        QSignalBlocker blocker(ui->listWidget);
+        for(int row = ui->listWidget->count() - 1; row >= 0; --row) {
+            QListWidgetItem *item = ui->listWidget->item(row);
+            if(item->data(Qt::UserRole + 1).value<ServerEntry*>()->manifest == previous)
+                delete ui->listWidget->takeItem(row);
+        }
+        manifest = fresh;
+        for(ServerEntry *server : fresh->servers) {
+            addServerEntry(server);
+            if(server == replacement)
+                ui->listWidget->setCurrentRow(ui->listWidget->count() - 1);
+        }
+        pendingLaunch = replacement;
+        previous->deleteLater();
+    }
+    if(isValidated(manifest))
+        finishOperation(true);
+    else
+        startValidation();
+}
+
+void MainWindow::finishItem(bool success) {
+    if(success)
+        ++currentFiles;
+    else
+        ++errorFiles;
+    ui->UpdateProgress->setValue(currentFiles);
+    if(currentFiles + errorFiles < maxFiles)
+        return;
+    if(errorFiles == 0 && operationDirectory == QDir::currentPath()) {
+        QSettings settings;
+        settings.setValue("manifestChecksum", manifest->checksum);
+        settings.setValue("oldDir", operationDirectory);
+        finishOperation(true);
+    } else {
+        finishOperation(false);
+        ErrorWindow *w = new ErrorWindow(this);
+        w->show();
+    }
 }
 
 /*
@@ -420,8 +524,10 @@ void MainWindow::setManifest(Manifest *manifest) {
      * validation progress to 0.
      */
     ui->LaunchButton->setEnabled(false);
-    ui->ValidateButton->setEnabled(true);
+    ui->ValidateButton->setEnabled(manifest && !optionsOpen);
     ui->UpdateProgress->setValue(0);
+    if(!manifest || optionsOpen)
+        return;
 
     /*
      * The checksum from the last valid manifest, and
@@ -442,8 +548,8 @@ void MainWindow::setManifest(Manifest *manifest) {
      */
     if(oldChecksum == manifest->checksum && oldDir == QDir::currentPath()) {
         currentFiles = manifest->items.size();
-        ui->UpdateProgress->setValue(currentFiles);
-        ui->UpdateProgress->setMaximum(currentFiles);
+        ui->UpdateProgress->setMaximum(qMax(1L, currentFiles));
+        ui->UpdateProgress->setValue(qMax(1L, currentFiles));
         ui->LaunchButton->setEnabled(true);
     }
 
@@ -454,6 +560,14 @@ void MainWindow::setManifest(Manifest *manifest) {
  * the manifest.
  */
 void MainWindow::validateManifest(Manifest *manifest) {
+    if(busy || optionsOpen || !manifest)
+        return;
+    this->manifest = manifest;
+    beginOperation();
+    startValidation();
+}
+
+void MainWindow::startValidation() {
 
     /*
      * Clear the last valid manifest and download
@@ -487,11 +601,20 @@ void MainWindow::validateManifest(Manifest *manifest) {
     ui->ValidateButton->setEnabled(false);
     ui->LaunchButton->setEnabled(false);
     ui->listWidget->setEnabled(false);
-    ui->UpdateProgress->setMaximum(maxFiles);
+    ui->UpdateProgress->setMaximum(qMax(1L, maxFiles));
+    ui->UpdateProgress->setValue(0);
 
     // Download and/or validate each file in the manifest.
+    if(maxFiles == 0) {
+        ui->UpdateProgress->setValue(1);
+        QSettings settings;
+        settings.setValue("manifestChecksum", manifest->checksum);
+        settings.setValue("oldDir", operationDirectory);
+        finishOperation(true);
+        return;
+    }
     for(ManifestItem *item : manifest->items)
-        downloadItem(item);
+        downloadItem(item, item->urls.size());
 
 }
 
@@ -500,8 +623,12 @@ void MainWindow::validateManifest(Manifest *manifest) {
  * or read from the local file system.
  */
 void MainWindow::loadManifests() {
-
+    cancelOperation();
+    ++loadGeneration;
     ui->listWidget->clear();
+    setManifest(nullptr);
+    for(Manifest *loaded : findChildren<Manifest*>(QString(), Qt::FindDirectChildrenOnly))
+        loaded->deleteLater();
     QSettings settings;
     QStringList manifests = settings.value("manifests").toString().split(" ");
 
@@ -514,12 +641,14 @@ void MainWindow::loadManifests() {
 
         // Read the manifest from the local file system.
         else
-            openManifest(manifest);
+            openManifest(url.toLocalFile());
 
     }
 
 }
 
 MainWindow::~MainWindow() {
+    ++loadGeneration;
+    cancelOperation();
     delete ui;
 }
