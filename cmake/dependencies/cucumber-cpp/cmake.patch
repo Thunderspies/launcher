@@ -1,0 +1,18 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -133,6 +133,8 @@
+     CUKE_VERSION="${CUKE_VERSION}"
+ )
+-
++
++option(CUKE_INSTALL "Enable Cucumber-Cpp installation" ON)
++if(CUKE_INSTALL)
+ include(GNUInstallDirs)
+ install(DIRECTORY ${CUKE_INCLUDE_DIR}/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+ install(
+@@ -155,3 +157,4 @@
+     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake
+     FILE        CucumberCppConfig.cmake
+ )
++endif()

@@ -1,0 +1,16 @@
+{
+  "format": 2,
+  "names": {
+    "assets/data.bin": {
+      "latest": "fdf1745c6dbbc775d1349e4708c7dd3cb194c08684f954ea761a0883c6ed91d4",
+      "versions": {
+        "417a01370c09d81e5fbc218a547db181886942553a34b7396d74c52bdbaca146": {
+          "captured_at": "2026-10-20T02:39:10.425310Z"
+        },
+        "fdf1745c6dbbc775d1349e4708c7dd3cb194c08684f954ea761a0883c6ed91d4": {
+          "captured_at": "2026-10-20T02:39:10.438423Z"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "format": 2,
+  "names": {
+    "b.bin": {
+      "latest": "27f39881a6cbb06b400331e09f624b2b54d366f652ca54d5fad217365906fa1e",
+      "versions": {
+        "27f39881a6cbb06b400331e09f624b2b54d366f652ca54d5fad217365906fa1e": {
+          "captured_at": "2026-10-20T02:39:10.505358Z"
+        },
+        "3200c8fb8396fec483bf00d1fc8a2132c8ab207c10bb2e3c8bf56ed3ee688928": {
+          "captured_at": "2026-10-20T02:39:10.492681Z"
+        },
+        "f9234baf3b24f09feddf80e6f876249f97e5fd38f950bb6ef384dc66ac8ce9db": {
+          "captured_at": "2026-10-20T02:39:10.469737Z"
+        }
+      }
+    }
+  }
+}

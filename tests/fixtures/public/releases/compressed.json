@@ -1,0 +1,21 @@
+{
+  "entry_point": null,
+  "format": 2,
+  "groups": {
+    "assets": {
+      "files": [
+        "2b702832c6c894e4b34f854cf21f65f6ec9b8c786468230118c1a73be5e7e5c3",
+        "61df5939cc9752a862e3729d195e22b7a2b277cd61e92c08df693fcaf2a91e43",
+        "70965814f2197d6f7034207365a559942d747c8e5388f4ad27433fd142e2b430",
+        "9e52b88c78b2b9d0799498a373077ab0b9b2aa80d12f0de03eb29b4b3964bf7e",
+        "f9234baf3b24f09feddf80e6f876249f97e5fd38f950bb6ef384dc66ac8ce9db"
+      ],
+      "path": "piggs/assets.hogg"
+    }
+  },
+  "loose": [
+    "db2ef9104807295154f9a72d72772d711287655144a4fde7555ab99f15615490"
+  ],
+  "release": "compressed",
+  "run_arguments": []
+}

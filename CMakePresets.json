@@ -1,0 +1,125 @@
+{
+	"version": 5,
+	"cmakeMinimumRequired": {
+		"major": 3,
+		"minor": 24,
+		"patch": 0
+	},
+	"configurePresets": [
+		{
+			"name": "base",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_INSTALL_PREFIX": "$env{HOME}/.local",
+				"CPM_SOURCE_CACHE": "$env{HOME}/.cache/CPM",
+				"BUILD_TESTING": true,
+				"BUILD_UNIT_TESTS": true,
+				"BUILD_ACCEPTANCE_TESTS": false
+			}
+		},
+		{
+			"name": "default",
+			"displayName": "Unit tests",
+			"inherits": "base",
+			"binaryDir": "${sourceDir}/build"
+		},
+		{
+			"name": "acceptance",
+			"displayName": "Unit and acceptance tests",
+			"inherits": "base",
+			"cacheVariables": {
+				"BUILD_ACCEPTANCE_TESTS": true
+			}
+		},
+		{
+			"name": "acceptance-only",
+			"displayName": "Acceptance tests only",
+			"inherits": "acceptance",
+			"cacheVariables": {
+				"BUILD_UNIT_TESTS": false
+			}
+		},
+		{
+			"name": "no-suites",
+			"displayName": "Both test suites disabled",
+			"inherits": "base",
+			"cacheVariables": {
+				"BUILD_UNIT_TESTS": false
+			}
+		},
+		{
+			"name": "no-tests",
+			"displayName": "Test infrastructure disabled",
+			"inherits": "base",
+			"cacheVariables": {
+				"BUILD_TESTING": false
+			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "default",
+			"configurePreset": "default"
+		},
+		{
+			"name": "acceptance",
+			"configurePreset": "acceptance"
+		},
+		{
+			"name": "acceptance-only",
+			"configurePreset": "acceptance-only"
+		},
+		{
+			"name": "no-suites",
+			"configurePreset": "no-suites"
+		},
+		{
+			"name": "no-tests",
+			"configurePreset": "no-tests"
+		}
+	],
+	"testPresets": [
+		{
+			"name": "test-base",
+			"hidden": true,
+			"output": {
+				"outputOnFailure": true
+			},
+			"execution": {
+				"noTestsAction": "error"
+			}
+		},
+		{
+			"name": "default",
+			"inherits": "test-base",
+			"configurePreset": "default"
+		},
+		{
+			"name": "acceptance",
+			"inherits": "test-base",
+			"configurePreset": "acceptance"
+		},
+		{
+			"name": "acceptance-only",
+			"inherits": "test-base",
+			"configurePreset": "acceptance-only"
+		},
+		{
+			"name": "no-suites",
+			"inherits": "test-base",
+			"configurePreset": "no-suites",
+			"execution": {
+				"noTestsAction": "ignore"
+			}
+		},
+		{
+			"name": "no-tests",
+			"inherits": "test-base",
+			"configurePreset": "no-tests",
+			"execution": {
+				"noTestsAction": "ignore"
+			}
+		}
+	]
+}

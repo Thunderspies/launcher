@@ -1,0 +1,16 @@
+{
+  "format": 2,
+  "names": {
+    "game.exe": {
+      "latest": "592cc937c2d0097a66be84261ea59f09139f31981101c1ba25f5a003e792effb",
+      "versions": {
+        "0e57eb8b694511d470397cb955996dffb337b03a1c09e98b9e778c8dffd84831": {
+          "captured_at": "2026-10-20T02:39:10.430046Z"
+        },
+        "592cc937c2d0097a66be84261ea59f09139f31981101c1ba25f5a003e792effb": {
+          "captured_at": "2026-10-20T02:39:10.441119Z"
+        }
+      }
+    }
+  }
+}

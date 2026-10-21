@@ -1,0 +1,12 @@
+{
+  "cached_header_sha256": "b37515ea1faff2e1387156c999a1936aace2eb60180d35b145cf634bd646388d",
+  "cached_header_size": 7,
+  "encoding": "zlib",
+  "format": 3,
+  "kind": "hogg",
+  "logical_md5": "21a199c53f422a380e20b162fb6ebe9c",
+  "name": "a.bin",
+  "sha256": "fda4111fabe7c717caffa962c79225d291b3e187b56cb1acb2e8b1c0b5ca1d9b",
+  "size": 4096,
+  "stored_size": 28
+}

@@ -1,0 +1,5 @@
+{
+  "repository": "../publisher",
+  "revision": "663e12c4ca3755be1adc764b6ddc9a7c44c1c4bd",
+  "generator": "python3 tests/fixtures/generate.py"
+}

@@ -1,0 +1,30 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,8 +1,18 @@
+-cmake_minimum_required(VERSION 3.7)
++cmake_minimum_required(VERSION 3.24)
+-
++
+-project(TCLAP VERSION 1.2.2)
++project(TCLAP VERSION 1.2.5 LANGUAGES CXX)
+-
++
+-set(CMAKE_CXX_STANDARD 98)
+-set(CMAKE_CXX_STANDARD_REQUIRED True)
++if(NOT DEFINED CMAKE_CXX_STANDARD)
++	set(CMAKE_CXX_STANDARD 98)
++	set(CMAKE_CXX_STANDARD_REQUIRED True)
++endif()
+-
++
+-add_subdirectory(examples)
++add_library(tclap INTERFACE)
++add_library(TCLAP::tclap ALIAS tclap)
++target_include_directories(tclap INTERFACE
++	"${CMAKE_CURRENT_SOURCE_DIR}/include")
++
++option(TCLAP_BUILD_EXAMPLES "Build TCLAP examples" OFF)
++if(TCLAP_BUILD_EXAMPLES)
++	add_subdirectory(examples)
++endif()

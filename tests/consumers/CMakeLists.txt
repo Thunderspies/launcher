@@ -1,0 +1,15 @@
+add_executable(c11_consumer c11.c)
+add_executable(cpp17_consumer cpp17.cpp)
+foreach(consumer IN ITEMS c11_consumer cpp17_consumer)
+	target_link_libraries(${consumer} PRIVATE launcher::launcher)
+	if(WIN32 AND LAUNCHER_BUILD_SHARED)
+		add_custom_command(TARGET ${consumer} POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different
+				$<TARGET_FILE:launcher> $<TARGET_FILE_DIR:${consumer}>)
+	endif()
+	if(NOT MSVC)
+		target_compile_options(${consumer} PRIVATE -pedantic-errors)
+	endif()
+	add_test(NAME ${consumer} COMMAND ${consumer})
+	set_tests_properties(${consumer} PROPERTIES LABELS unit)
+endforeach()

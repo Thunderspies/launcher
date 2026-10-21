@@ -1,0 +1,13 @@
+{
+  "format": 2,
+  "names": {
+    "binary/payload.bin": {
+      "latest": "7179338125def3dd4b9128debf969eb399f89d5b964625f00594ed748baee608",
+      "versions": {
+        "7179338125def3dd4b9128debf969eb399f89d5b964625f00594ed748baee608": {
+          "captured_at": "2026-10-20T02:39:10.454392Z"
+        }
+      }
+    }
+  }
+}

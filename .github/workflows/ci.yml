@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suites:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux GCC
+            os: ubuntu-24.04
+            cc: gcc-14
+            cxx: g++-14
+            shell: bash
+          - name: Linux Clang
+            os: ubuntu-24.04
+            cc: clang-18
+            cxx: clang++-18
+            shell: bash
+          - name: Windows MSVC
+            os: windows-2022
+            cc: cl
+            cxx: cl
+            shell: pwsh
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    env:
+      BUNDLE_FROZEN: 'true'
+
+    steps:
+      - name: Preserve LF line endings on Windows
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+
+      - name: Check out sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby and locked gems
+        uses: ruby/setup-ruby@e81a8fa391b11a595c1b7ed84177cc0fe02faf83 # v1
+        with:
+          ruby-version: '3.3'
+          bundler: Gemfile.lock
+          bundler-cache: true
+
+      - name: Install patch on Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y patch
+
+      - name: Install patch on Windows
+        if: runner.os == 'Windows'
+        run: ridk exec pacman --sync --needed --noconfirm patch
+
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+
+      - name: Cache CPM dependency sources
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: build/cpm-cache
+          key: cpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/**') }}
+
+      - name: Generate CI presets
+        env:
+          CI_C_COMPILER: ${{ matrix.cc }}
+          CI_CXX_COMPILER: ${{ matrix.cxx }}
+        run: |
+          ruby -rjson -e '
+            presets = {
+              "version" => 5,
+              "configurePresets" => [{
+                "name" => "ci",
+                "inherits" => "acceptance",
+                "generator" => "Ninja",
+                "binaryDir" => "${sourceDir}/build/ci",
+                "cacheVariables" => {
+                  "CMAKE_BUILD_TYPE" => "Debug",
+                  "CMAKE_C_COMPILER" => ENV.fetch("CI_C_COMPILER"),
+                  "CMAKE_CXX_COMPILER" => ENV.fetch("CI_CXX_COMPILER"),
+                  "CMAKE_INSTALL_PREFIX" => "${sourceDir}/build/install",
+                  "CPM_SOURCE_CACHE" => "${sourceDir}/build/cpm-cache"
+                }
+              }],
+              "buildPresets" => [{
+                "name" => "ci",
+                "inherits" => "acceptance",
+                "configurePreset" => "ci"
+              }],
+              "testPresets" => [{
+                "name" => "ci",
+                "inherits" => "acceptance",
+                "configurePreset" => "ci",
+                "execution" => { "noTestsAction" => "error" }
+              }]
+            }
+            File.write("CMakeUserPresets.json",
+              JSON.pretty_generate(presets) + "\n")
+          '
+
+      - name: Configure
+        run: cmake --preset ci
+
+      - name: Build
+        run: cmake --build --preset ci --parallel 2
+
+      - name: Run infrastructure regressions
+        run: ctest --preset ci -L '^infrastructure$'
+
+      - name: Run product unit and acceptance suites
+        run: ctest --preset ci -L '^(unit|acceptance)$'

@@ -1,0 +1,11 @@
+CPMAddPackage(
+	NAME GTest
+	VERSION 1.18.0
+	GITHUB_REPOSITORY google/googletest
+	GIT_TAG v1.18.0
+	EXCLUDE_FROM_ALL YES
+	OPTIONS
+		"INSTALL_GTEST OFF"
+		"BUILD_GMOCK OFF"
+		"gtest_force_shared_crt ON"
+)

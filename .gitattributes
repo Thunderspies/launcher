@@ -1,0 +1,2 @@
+# Content-addressed publisher objects must preserve their original bytes.
+/tests/fixtures/public/objects/* -text
